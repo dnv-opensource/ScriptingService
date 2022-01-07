@@ -50,7 +50,9 @@ namespace ixion { namespace javascript {
         bool IsReservedWord(const std::string& identifier) const;
         virtual void setLineNumber(int lineNumber);
         void SetLineNumberHandler(const std::function<void(int lineNumber)>& lineNumberSetter);
+        void SetLastLineNumberHandler(const std::function<void(int lineNumber)>& lastLineNumberSetter);
         std::set<std::string> GetNames() const;
+        void setLastLineNumber(int lineNumber) override;
     private:
         ref_ptr<value> CreateOrReuseExistingIdentifier(context const& ctx, const std::string& name, const ref_ptr<value>& value);
         ref_ptr<value> CreateIdentifier(const ref_ptr<value>& value);
@@ -60,6 +62,7 @@ namespace ixion { namespace javascript {
         jsTypeLibrary& m_typeLibrary;      
         mofa::ref<jsModelObject> m_global;
         std::function<void(int lineNumber)> m_lineNumberSetter;
+        std::function<void(int lastLineNumber)> m_lastLineNumberSetter;
         void SetNoNameIfNameSameAsIdentifier(ref_ptr<value> member, const std::string& identifier);
         void ConditionallySetName(const std::shared_ptr<DNVS::MoFa::Scripting::INewObjectScope>& newObjectScope, ref_ptr<value> member, const std::string& name);
         void ThrowIfNotValidIdentifier(const std::string& identifier);

@@ -99,13 +99,15 @@ private:
     }
 };
 
-jsScriptingService::jsScriptingService(const std::shared_ptr<jsTypeLibrary>& typeLibrary, std::shared_ptr<INameService> nameService, const std::function<void(int)>& lineNumberCallback)
+jsScriptingService::jsScriptingService(const std::shared_ptr<jsTypeLibrary>& typeLibrary, std::shared_ptr<INameService> nameService, const std::function<void(int)>& lineNumberCallback, const std::function<void(int)>& lastLineNumberCallback)
     : m_typeLibrary(typeLibrary)
     , m_impl(new jsScriptingServiceImpl(*typeLibrary))
     , m_executionStatus(ExecutionStatus::NoExecution)
 {
     if(lineNumberCallback)
-        m_impl->extendedListScope->SetLineNumberHandler([this, lineNumberCallback](int lineNumber) {lineNumberCallback(lineNumber); });
+        m_impl->extendedListScope->SetLineNumberHandler(lineNumberCallback);
+    if(lastLineNumberCallback)
+        m_impl->extendedListScope->SetLastLineNumberHandler(lastLineNumberCallback);
     typeLibrary->GetReflectionTypeLibrary()->GetServiceProvider().RegisterService<ILValueService>(std::make_shared<jsScriptingLValueService>());
     typeLibrary->GetReflectionTypeLibrary()->GetServiceProvider().RegisterService(nameService);
     ServiceProvider::Instance().RegisterService<IScriptingPropertyService>(std::make_shared<jsScriptingPropertyService>());
@@ -127,7 +129,7 @@ Objects::Object TryExecute(Lambda lambda)
     }
     catch (ixion::javascript_exception& e)
     {
-        throw line_exception(e.what(), e.Line);
+        throw line_exception(e.what(), (int)e.Line);
     }
     catch (std::exception& e)
     {
@@ -416,7 +418,7 @@ bool jsScriptingService::TryGetName(const Objects::Object& object, std::string& 
     return false;
 }
 
-extern "C" __declspec(dllexport) DNVS::MoFa::Scripting::IScriptingService* CreateScriptingService(const std::shared_ptr<jsTypeLibrary>& typeLibrary, const std::shared_ptr<DNVS::MoFa::Scripting::INameService>& nameService, const std::function<void(int)>& lineNumberCallback = nullptr)
+extern "C" __declspec(dllexport) DNVS::MoFa::Scripting::IScriptingService* CreateScriptingService(const std::shared_ptr<jsTypeLibrary>& typeLibrary, const std::shared_ptr<DNVS::MoFa::Scripting::INameService>& nameService, const std::function<void(int)>& lineNumberCallback = nullptr, const std::function<void(int)>& lastLineNumberCallback = nullptr)
 {
-    return new jsScriptingService(typeLibrary, nameService, lineNumberCallback);
+    return new jsScriptingService(typeLibrary, nameService, lineNumberCallback, lastLineNumberCallback);
 }

@@ -28,7 +28,7 @@ class jsScriptingServiceImpl;
 class jsScriptingService : public DNVS::MoFa::Scripting::IScriptingService
 {
 public:
-    jsScriptingService(const std::shared_ptr<jsTypeLibrary>& typeLibrary, std::shared_ptr<DNVS::MoFa::Scripting::INameService> nameService, const std::function<void(int)>& lineNumberCallback = nullptr);
+    jsScriptingService(const std::shared_ptr<jsTypeLibrary>& typeLibrary, std::shared_ptr<DNVS::MoFa::Scripting::INameService> nameService, const std::function<void(int)>& lineNumberCallback = nullptr, const std::function<void(int)>& lastLineNumberCallback = nullptr);
     ~jsScriptingService();
     DNVS::MoFa::Reflection::Objects::Object Execute(const std::string& str, bool logging = false) override;
     DNVS::MoFa::Reflection::Objects::Object Execute(std::istream& istr, bool logging = false) override;

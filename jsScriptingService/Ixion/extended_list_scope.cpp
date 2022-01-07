@@ -37,6 +37,7 @@
 #include "jsScript/jsTypeInfo.h"
 #include "jsScript/jsConstructor.h"
 #include "dual_delegate.h"
+#include "Services/ScopedServiceRegistration.h"
 
 using namespace DNVS::MoFa::TypeUtilities;
 using namespace DNVS::MoFa::Services;
@@ -141,7 +142,42 @@ namespace ixion { namespace javascript {
     {
         return m_valueCreation->MakeLValue(val);
     }
+    class JoinedNewObjectScope : public INewObjectScope
+    {
+    public:
+        JoinedNewObjectScope(std::shared_ptr<INewObjectScope> oldScope, std::shared_ptr<INewObjectScope> newScope)
+            : m_oldScope(oldScope)
+            , m_newScope(newScope)
+        {}
+        bool IsNewObject(const Objects::Object& object) const override
+        {
+            if (m_oldScope && m_oldScope->IsNewObject(object))
+                return true;
+            if (m_newScope && m_newScope->IsNewObject(object))
+                return true;
+            return false;
+        }
 
+        void AddNewObject(const Objects::Object& object) override
+        {            
+            if (m_oldScope)
+                m_oldScope->AddNewObject(object);
+            if (m_newScope)
+                m_newScope->AddNewObject(object);
+        }
+
+
+        void RenameObject(const Object& object, bool added) override
+        {
+            if (m_oldScope)
+                m_oldScope->RenameObject(object, added);
+            if (m_newScope)
+                m_newScope->RenameObject(object, added);
+        }
+    private:
+        std::shared_ptr<INewObjectScope> m_oldScope;
+        std::shared_ptr<INewObjectScope> m_newScope;
+    };
     ixion::ref_ptr<value> extended_list_scope::AssignAndRename(context const& ctx, const std::string& name, const ref_ptr<expression>& expression, const std::function<ref_ptr<value>(const ref_ptr<value>&)>& createIdentifier)
     {
         try
@@ -150,9 +186,9 @@ namespace ixion { namespace javascript {
             if(!nameService)
                 throw std::runtime_error("NameService not defined");
             auto inAssignment = Scope(m_isInAssignment, true);
+            std::shared_ptr<INewObjectScope> oldObjectScope = m_typeLibrary.GetReflectionTypeLibrary()->GetServiceProvider().TryGetService<INewObjectScope>();
             std::shared_ptr<INewObjectScope> newObjectScope = nameService->CreateNewObjectScope();
-            if (newObjectScope)
-                m_typeLibrary.GetReflectionTypeLibrary()->GetServiceProvider().RegisterService(newObjectScope);
+            ScopedServiceRegistration<INewObjectScope> scope(std::make_shared<JoinedNewObjectScope>(oldObjectScope, newObjectScope), m_typeLibrary.GetReflectionTypeLibrary()->GetServiceProvider());
             ref_ptr<value> def;
             if (expression)
                 def = expression->evaluate(ctx)->eliminateWrappers()->duplicate();
@@ -163,7 +199,6 @@ namespace ixion { namespace javascript {
             removeMember(name);
             addMember(name, member);
             ConditionallySetName(newObjectScope, member, name);
-            m_typeLibrary.GetReflectionTypeLibrary()->GetServiceProvider().UnregisterService<INewObjectScope>();
             return member;
         }
         catch (javascript_exception&)
@@ -272,6 +307,11 @@ namespace ixion { namespace javascript {
         m_lineNumberSetter = lineNumberSetter;
     }
 
+    void extended_list_scope::SetLastLineNumberHandler(const std::function<void(int lineNumber)>& lastLineNumberSetter)
+    {
+        m_lastLineNumberSetter = lastLineNumberSetter;
+    }
+
     std::set<std::string> extended_list_scope::GetNames() const
     {
         std::set<std::string> names;
@@ -280,6 +320,12 @@ namespace ixion { namespace javascript {
             names.insert(memberPair.first);
         }
         return names;
+    }
+
+    void extended_list_scope::setLastLineNumber(int lineNumber)
+    {
+        if (m_lastLineNumberSetter)
+            m_lastLineNumberSetter(lineNumber);
     }
 
     void extended_list_scope::SetNoNameIfNameSameAsIdentifier(ref_ptr<value> member, const std::string& identifier)
